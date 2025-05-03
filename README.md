@@ -30,12 +30,18 @@
 ```
 
 ## TO Run
+
 ```bash
 aginisi serve --port 5000
 ```
 This will start a server on http://localhost:5000 and look for or create a aginisi/ folder with .json files (like users.json, posts.json, etc.).
 
+---
+
 ## 🧪 Example Usage
+
+### 📥 Create (POST)
+
 ```http
 POST /users
 Content-Type: application/json
@@ -45,12 +51,12 @@ Content-Type: application/json
   "email": "alice@example.com"
 }
 ```
-### 📥 Create (POST)
+
 ### 📤 Read (GET)
 ### ✏️ Update (PUT)
 ### ❌ Delete (DELETE)
 
-
+---
 
 ## 🗃️ JSON Table Format
 Each .json file should contain an array of objects, for example:
@@ -60,7 +66,7 @@ Each .json file should contain an array of objects, for example:
   { "id": 2, "name": "Bob" }
 ]
 ```
-
+---
 
 ## 📡 Coming Soon
 - 🔄 Real-time change broadcasting with Socket.IO
@@ -68,5 +74,6 @@ Each .json file should contain an array of objects, for example:
 - 📊 Schema validation & mock data generators
 - 📁 Swagger/OpenAPI generation
 
+---
 <!-- 🤝 Contributing
 PRs and issues are welcome! File bugs or request features on the GitHub Issues page. -->
