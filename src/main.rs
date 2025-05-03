@@ -1,10 +1,15 @@
+use std::collections::HashMap;
 use std::fmt::format;
 use std::fs::{self, File};
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::{Path as FilePath, PathBuf};
 
-use axum::Router;
-use axum::routing::{get, get_service};
+use aginisi::model::data::Data;
+use axum::Json;
+use axum::extract::Query;
+use axum::http::Method;
+use axum::routing::{any, get, get_service};
+use axum::{Router, extract::Path as RoutePath};
 use clap::Parser;
 use serde_json::{Value, json};
 use tower_http::services::ServeDir;
@@ -23,7 +28,7 @@ struct Args {
 const FOLDER_NAME: &str = "aginisi";
 
 fn create_file(file_name: &str) {
-    if !Path::new(&format!("{}/{}.json", FOLDER_NAME, file_name)).exists() {
+    if !FilePath::new(&format!("{}/{}.json", FOLDER_NAME, file_name)).exists() {
         File::create(format!("{}/{}.json", FOLDER_NAME, file_name)).unwrap();
     }
 }
@@ -40,7 +45,7 @@ fn delete_file(file_name: &str) -> () {
 
 fn read_json(file_name: &str) -> Value {
     let path = format!("{}/{}.json", FOLDER_NAME, file_name);
-    if !Path::new(&path).exists() {
+    if !FilePath::new(&path).exists() {
         return json!([]); // Default to empty array
     }
     let data = fs::read_to_string(path).unwrap_or_else(|_| "[]".to_string());
@@ -115,7 +120,9 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let app = Router::new().route("/", get(root));
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/{*path}", any(f_route));
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await
         .unwrap();
@@ -129,4 +136,34 @@ async fn main() {
 
 async fn root() -> &'static str {
     "Hello, World!"
+}
+
+async fn f_route(
+    method: Method,
+    RoutePath(path): RoutePath<String>,
+    Query(params): Query<HashMap<String, String>>,
+    Json(data): Json<Data>,
+) -> String {
+    let a = || {
+        let mut b = path.rsplit("/").collect::<Vec<&str>>();
+        b.reverse();
+        b
+    };
+
+    let res = match method {
+        Method::GET => {
+            let limit = params.get("limit");
+            let offset = params.get("offset");
+
+            // let paged: Vec<_> = data.iter().skip(offset).take(limit).cloned().collect();
+
+            todo!()
+        }
+        Method::POST => todo!(),
+        Method::PUT => todo!(),
+        Method::DELETE => todo!(),
+        _ => todo!(),
+    };
+    //limit, offset
+    format!("You requested file at:{} => {} => {:?}", method, path, a())
 }
