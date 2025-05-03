@@ -22,10 +22,12 @@
 
 ## 📂 Project Structure
 
+```
 ├── aginisi/
 │ ├── users.json
 │ └── products.json
 ├── aginisi.toml # optional config
+```
 
 ## TO Run
 ```bash
