@@ -47,15 +47,38 @@ POST /users
 Content-Type: application/json
 
 {
-  "name": "Alice",
-  "email": "alice@example.com"
+  "data":{
+    "name":"alex",
+    "email":"alex@gmail.com"
+  }
 }
 ```
 
 ### 📤 Read (GET)
-### ✏️ Update (PUT)
-### ❌ Delete (DELETE)
+```http
+GET /users
+Content-Type: application/json
 
+{}
+```
+### ✏️ Update (PATCH)
+```http
+PATCH /users/3
+Content-Type: application/json
+
+{
+  "data":{
+    "email":"alex1@gmail.com"
+  }
+}
+```
+### ❌ Delete (DELETE)
+```http
+DELETE /users/3
+Content-Type: application/json
+
+{}
+```
 ---
 
 ## 🗃️ JSON Table Format

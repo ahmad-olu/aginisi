@@ -74,12 +74,27 @@ fn write_to_json(file_name: &str, data: &Value) {
 //CRUD
 
 // ! create data
-fn create_data(file_name: &str, item: Value) {
+fn create_data(file_name: &str, mut item: Value) -> Value {
     let mut data = read_json(file_name);
     if let Value::Array(arr) = &mut data {
-        arr.push(item);
+        let next_id = arr
+            .iter()
+            .filter_map(|v| v.get("id"))
+            .filter_map(|id| id.as_u64())
+            .max()
+            .unwrap_or(0)
+            + 1;
+
+        if let Value::Object(map) = &mut item {
+            if let None = map.get("id") {
+                map.insert("id".to_string(), json!(next_id));
+            }
+        }
+        arr.push(item.clone());
         write_to_json(file_name, &data);
+        return item;
     }
+    return json!({});
 
     // if let Value::Object(map) = &mut data {
     //     map.insert("1".to_string(), item);
@@ -87,15 +102,21 @@ fn create_data(file_name: &str, item: Value) {
 }
 
 // ! update data
-fn update_data(file_name: &str, id: u64, key: &str, new_value: Value) {
+fn update_data(file_name: &str, id: u64, key: &str, new_value: Value) -> Value {
     let mut data = read_json(file_name);
+    let mut res = json!({});
     if let Value::Array(arr) = &mut data {
         for obj in arr.iter_mut() {
             if obj.get("id") == Some(&Value::Number(id.into())) {
                 obj[key] = new_value.clone();
+                res = obj.clone();
             }
         }
         write_to_json(file_name, &data);
+
+        return res;
+    } else {
+        return json!({});
     }
 }
 // ! delete data
@@ -115,19 +136,6 @@ async fn main() {
             fs::create_dir(FOLDER_NAME).unwrap();
         }
     }
-    // create_file("auth");
-    // create_data("auth", json!({ "id": 1, "name": "Alice" }));
-    // create_data("auth", json!({ "id": 2, "title": "Todo item" }));
-    // create_data("auth", json!({ "id": 3, "title": "John mango" }));
-
-    // update_data("auth", 1, "name", json!("John does"));
-
-    // delete_data("auth", 3);
-
-    // println!("{}", read_json("auth"));
-    // println!("{:#?}", read_json("auth"));
-
-    // println!("=======>{:?} ==========>{}", args.path, args.port);
 
     if !args.path.exists() || !args.path.is_dir() {
         eprintln!("Invalid path: {}", args.path.display());
@@ -182,7 +190,6 @@ async fn f_route(
                     .unwrap_or(&"0".to_string())
                     .parse()
                     .unwrap();
-
                 let file_name = split_part().get(0).unwrap().to_string();
                 let empty_vec: Vec<Value> = vec![];
                 let json = read_json(&file_name);
@@ -208,8 +215,8 @@ async fn f_route(
             if split_part().len() == 1 {
                 let file_name = split_part().get(0).unwrap().to_string();
                 if let Some(data) = data.data {
-                    create_data(&file_name, data.clone());
-                    return Json(data);
+                    let res = create_data(&file_name, data.clone());
+                    return Json(res);
                 } else {
                     return Json(json!({}));
                 }
@@ -217,23 +224,24 @@ async fn f_route(
                 return Json(json!({}));
             }
         }
-        Method::PUT => {
+        Method::PATCH => {
             if split_part().len() == 1 {
                 return Json(json!({}));
             } else if split_part().len() == 2 {
                 let file_name = split_part().get(0).unwrap().to_string();
-                let id: u64 = split_part().get(2).unwrap().to_string().parse().unwrap();
+                let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
 
                 if let Some(data) = data.data {
+                    let mut res = json!({});
                     if data.is_object() {
                         let data = data.as_object().unwrap();
                         if let Some((key, value)) = data.iter().next() {
                             let key = key;
                             let value = value.clone();
-                            update_data(&file_name, id, key, value);
+                            res = update_data(&file_name, id, key, value);
                         }
                     }
-                    return Json(json!(data));
+                    return Json(res);
                 } else {
                     return Json(json!({}));
                 }
@@ -246,7 +254,7 @@ async fn f_route(
                 return Json(json!({}));
             } else if split_part().len() == 2 {
                 let file_name = split_part().get(0).unwrap().to_string();
-                let id: u64 = split_part().get(2).unwrap().to_string().parse().unwrap();
+                let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
                 delete_data(&file_name, id);
                 return Json(json!({}));
             } else {
