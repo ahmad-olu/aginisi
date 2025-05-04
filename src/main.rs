@@ -4,6 +4,7 @@ use std::fs::{self, File};
 use std::net::SocketAddr;
 use std::path::{Path as FilePath, PathBuf};
 
+use aginisi::docs;
 use aginisi::model::data::Data;
 use axum::Json;
 use axum::extract::Query;
@@ -14,15 +15,27 @@ use clap::Parser;
 use serde_json::{Value, json};
 use tower_http::services::ServeDir;
 
+//cargo run -- --help
 #[derive(Parser, Debug)]
+#[command(name = "Aginisi", version, about = "Fast JSON-Backed Mock API Server")]
 struct Args {
-    /// Path to serve
-    #[arg(default_value = ".")]
+    #[arg(
+        long,
+        default_value = ".",
+        help = "Specify the path to serve files from"
+    )]
     path: PathBuf,
 
-    /// Port number
-    #[arg(short, long, default_value_t = 8080)]
+    #[arg(
+        short,
+        long,
+        default_value_t = 8080,
+        help = "Port number to bind the server"
+    )]
     port: u16,
+
+    #[arg(short, long, default_value_t = false, help = "docs or how to use")]
+    docs: bool,
 }
 
 const FOLDER_NAME: &str = "aginisi";
@@ -46,6 +59,7 @@ fn delete_file(file_name: &str) -> () {
 fn read_json(file_name: &str) -> Value {
     let path = format!("{}/{}.json", FOLDER_NAME, file_name);
     if !FilePath::new(&path).exists() {
+        create_file(file_name);
         return json!([]); // Default to empty array
     }
     let data = fs::read_to_string(path).unwrap_or_else(|_| "[]".to_string());
@@ -120,6 +134,11 @@ async fn main() {
         std::process::exit(1);
     }
 
+    if args.docs == true {
+        docs::docs();
+        std::process::exit(1);
+    }
+
     let app = Router::new()
         .route("/", get(root))
         .route("/{*path}", any(f_route));
@@ -143,27 +162,98 @@ async fn f_route(
     RoutePath(path): RoutePath<String>,
     Query(params): Query<HashMap<String, String>>,
     Json(data): Json<Data>,
-) -> String {
-    let a = || {
+) -> Json<Value> {
+    let split_part = || {
         let mut b = path.rsplit("/").collect::<Vec<&str>>();
         b.reverse();
         b
     };
 
-    let res = match method {
+    let res: Json<Value> = match method {
         Method::GET => {
-            let limit = params.get("limit");
-            let offset = params.get("offset");
+            if split_part().len() == 1 {
+                let limit: usize = params
+                    .get("limit")
+                    .unwrap_or(&"20".to_string())
+                    .parse()
+                    .unwrap();
+                let offset: usize = params
+                    .get("offset")
+                    .unwrap_or(&"0".to_string())
+                    .parse()
+                    .unwrap();
 
-            // let paged: Vec<_> = data.iter().skip(offset).take(limit).cloned().collect();
-
-            todo!()
+                let file_name = split_part().get(0).unwrap().to_string();
+                let empty_vec: Vec<Value> = vec![];
+                let json = read_json(&file_name);
+                let json_array = json.as_array().unwrap_or(&empty_vec);
+                if let Some(filter) = data.filter {
+                    let data: Vec<_> = json_array
+                        .iter()
+                        .skip(offset)
+                        .take(limit)
+                        .filter(|row| filter.evaluate(row))
+                        .clone()
+                        .collect();
+                    return Json(json!(data));
+                }
+                let data: Vec<_> = json_array.iter().skip(offset).take(limit).clone().collect();
+                return Json(json!(data));
+            } else if split_part().len() == 2 {
+                return Json(json!([]));
+            }
+            return Json(json!([]));
         }
-        Method::POST => todo!(),
-        Method::PUT => todo!(),
-        Method::DELETE => todo!(),
-        _ => todo!(),
+        Method::POST => {
+            if split_part().len() == 1 {
+                let file_name = split_part().get(0).unwrap().to_string();
+                if let Some(data) = data.data {
+                    create_data(&file_name, data.clone());
+                    return Json(data);
+                } else {
+                    return Json(json!({}));
+                }
+            } else {
+                return Json(json!({}));
+            }
+        }
+        Method::PUT => {
+            if split_part().len() == 1 {
+                return Json(json!({}));
+            } else if split_part().len() == 2 {
+                let file_name = split_part().get(0).unwrap().to_string();
+                let id: u64 = split_part().get(2).unwrap().to_string().parse().unwrap();
+
+                if let Some(data) = data.data {
+                    if data.is_object() {
+                        let data = data.as_object().unwrap();
+                        if let Some((key, value)) = data.iter().next() {
+                            let key = key;
+                            let value = value.clone();
+                            update_data(&file_name, id, key, value);
+                        }
+                    }
+                    return Json(json!(data));
+                } else {
+                    return Json(json!({}));
+                }
+            } else {
+                return Json(json!({}));
+            }
+        }
+        Method::DELETE => {
+            if split_part().len() == 1 {
+                return Json(json!({}));
+            } else if split_part().len() == 2 {
+                let file_name = split_part().get(0).unwrap().to_string();
+                let id: u64 = split_part().get(2).unwrap().to_string().parse().unwrap();
+                delete_data(&file_name, id);
+                return Json(json!({}));
+            } else {
+                return Json(json!({}));
+            }
+        }
+        _ => Json(json!({})),
     };
-    //limit, offset
-    format!("You requested file at:{} => {} => {:?}", method, path, a())
+    return res;
 }

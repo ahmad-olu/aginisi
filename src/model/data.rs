@@ -5,7 +5,7 @@ use super::{filter_type::FilterType, sort_type::SortType};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Data {
-    pub filter: FilterType,
-    pub sort: SortType,
-    pub data: Value,
+    pub filter: Option<FilterType>,
+    pub sort: Option<SortType>,
+    pub data: Option<Value>,
 }
