@@ -3,6 +3,8 @@ use std::fs::{self};
 use aginisi::cmd_args::Args;
 use aginisi::consts::FOLDER_NAME;
 use aginisi::docs;
+use aginisi::routes::auth::auth_router;
+use aginisi::routes::file::file_router;
 use aginisi::routes::{f_route, root};
 use axum::Router;
 use axum::routing::{any, get};
@@ -31,6 +33,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(root))
+        .nest("/auth", auth_router())
+        .nest("/file", file_router())
         .route("/{*path}", any(f_route));
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await

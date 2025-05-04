@@ -1,3 +1,6 @@
+pub mod auth;
+pub mod file;
+
 use std::collections::HashMap;
 
 use axum::Json;

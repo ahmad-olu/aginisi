@@ -1,11 +1,21 @@
 # 🔧 Aginisi — Fast JSON-Backed Mock API Server
 
+## overview
 **Aginisi** is a developer-first Rust application for quickly spinning up a local backend server with zero setup. Ideal for frontend developers and prototypers who want to:
 - Mock out APIs fast.
 - Store tables as editable `.json` files.
 - Run CRUD and filter operations over HTTP.
 - Choose your port and path.
 - Preview real-time update support (coming soon with Socket.IO).
+
+---
+
+## 🔧 Motivation
+As a frontend developer who also builds backends—often using different languages for each—I’ve repeatedly encountered a common challenge: after building the backend, I find that integrating it with my frontend can be frustrating because the data shape or API responses weren’t fully anticipated during the frontend development. This mismatch slows me down, especially when rapidly prototyping MVPs or testing new product ideas.
+
+To solve this, I created this tool to let me design and prototype REST APIs around the needs of my frontend first. It allows me to simulate backend behavior with flexible JSON-based data storage, CRUD operations, and filtering—so I can build and test my UI against realistic endpoints from day one. Once the frontend is solid, I can then implement the real backend with a clear understanding of the data structure and interactions needed.
+
+This approach bridges the gap between frontend and backend during prototyping and speeds up development of MVPs, internal tools, and early-stage features.
 
 ---
 
