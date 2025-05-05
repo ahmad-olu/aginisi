@@ -89,6 +89,33 @@ Content-Type: application/json
 
 {}
 ```
+
+## Auth
+
+### 📥 Sign Up (POST)
+
+```http
+POST /auth/sign_up
+content-type: application/x-www-form-urlencoded
+
+{
+    "name": "myNameIsMyName"
+    "email": "email@email.com",
+    "password": "verySecuredPassword"
+}
+```
+
+### 📥 Sign In (POST)
+
+```http
+POST /auth/sign_in
+content-type: application/x-www-form-urlencoded
+
+{
+    "email": "email@email.com",
+    "password": "verySecuredPassword"
+}
+```
 ---
 
 ## 🗃️ JSON Table Format
