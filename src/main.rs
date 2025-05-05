@@ -1,7 +1,7 @@
 use std::fs::{self};
 
 use aginisi::cmd_args::Args;
-use aginisi::consts::FOLDER_NAME;
+use aginisi::consts::{FOLDER_NAME, UPLOAD_FOLDER_NAME};
 use aginisi::docs;
 use aginisi::routes::auth::auth_router;
 use aginisi::routes::file::file_router;
@@ -18,6 +18,12 @@ async fn main() {
     if let Ok(exist) = fs::exists(FOLDER_NAME) {
         if !exist {
             fs::create_dir(FOLDER_NAME).unwrap();
+        }
+    }
+
+    if let Ok(exist) = fs::exists(UPLOAD_FOLDER_NAME) {
+        if !exist {
+            fs::create_dir(UPLOAD_FOLDER_NAME).unwrap();
         }
     }
 

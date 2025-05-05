@@ -3,6 +3,8 @@ use std::sync::LazyLock;
 use crate::model::auth::Keys;
 
 pub const FOLDER_NAME: &str = "aginisi";
+pub const UPLOAD_FOLDER_NAME: &str = "aginisi_file";
+
 pub const AUTH_TABLE_NAME: &str = "auth";
 
 pub static KEYS: LazyLock<Keys> = LazyLock::new(|| {

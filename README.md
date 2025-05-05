@@ -116,6 +116,27 @@ content-type: application/x-www-form-urlencoded
     "password": "verySecuredPassword"
 }
 ```
+
+## File
+
+### Upload
+```http
+POST /file/upload
+content-type: multipart/form-data
+
+{
+    "key": "file",
+    "value": "your image"
+}
+```
+
+### Download
+```http
+GET /file/files/:image_name
+content-type: application/octet-stream
+
+{}
+```
 ---
 
 ## 🗃️ JSON Table Format
