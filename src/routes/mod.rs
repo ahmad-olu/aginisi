@@ -55,7 +55,7 @@ pub async fn f_route(
             AuthType::Session => match headers.get("x-session").and_then(|v| v.to_str().ok()) {
                 Some(session) => {
                     if let Some(values) = read_json("session").as_array() {
-                        let id = session.parse::<i64>().unwrap();
+                        let id = session.parse::<u64>().unwrap();
                         let mut authorized = false;
                         for a in values.iter() {
                             if a.get("id") == Some(&Value::Number(id.into())) {

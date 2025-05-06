@@ -5,6 +5,7 @@ use argon2::{
 use axum::{
     Form, Json, Router,
     extract::State,
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
 use chrono::{Duration, Utc};
@@ -13,7 +14,10 @@ use serde_json::{Value, json};
 
 use crate::{
     consts::{AUTH_TABLE_NAME, KEYS},
-    helpers::{crud::create_data, json::read_json},
+    helpers::{
+        crud::{create_data, delete_data},
+        json::read_json,
+    },
     model::{
         auth::{AuthBody, Claims, SignInInput, SignUpInput},
         toml_config::{AuthType, Config},
@@ -59,7 +63,7 @@ async fn sign_up(Form(input): Form<SignUpInput>) -> Json<Value> {
 async fn sign_in(
     State(state): State<Config>,
     Form(input): Form<SignInInput>,
-) -> Result<Json<Value>, String> {
+) -> Result<Json<Value>, (StatusCode, Value)> {
     let mut data = read_json(AUTH_TABLE_NAME);
 
     let mut email_exist = false;
@@ -80,13 +84,16 @@ async fn sign_in(
         let hash = hashed_password.unwrap();
         let parsed_hash = PasswordHash::new(hash);
         if let Err(e) = parsed_hash {
-            return Err(format!("{:?}", e));
+            return Err((StatusCode::BAD_REQUEST, json!({"message":""})));
         }
         if !Argon2::default()
             .verify_password(input.password.as_bytes(), &parsed_hash.unwrap())
             .is_ok()
         {
-            return Err("email or password in incorrect".to_string());
+            return Err((
+                StatusCode::BAD_REQUEST,
+                json!({"message":"email or password in incorrect"}),
+            ));
         }
 
         if let Some(auth) = state.auth {
@@ -126,8 +133,25 @@ async fn sign_in(
             }
         }
     }
-
-    Err("Email does not exist".to_string())
+    Err((
+        StatusCode::CONFLICT,
+        json!({"message":"Email does not exist"}),
+    ))
 }
 
-async fn sign_out(State(state): State<Config>) -> Result<Json<Value>, String> {}
+async fn sign_out(
+    State(state): State<Config>,
+    headers: HeaderMap,
+) -> Result<(), (StatusCode, Value)> {
+    if let Some(a) = state.auth {
+        if a == AuthType::Session {
+            if let Some(header) = headers.get("x-session").and_then(|v| v.to_str().ok()) {
+                let id = header.parse::<u64>().unwrap();
+                delete_data("session", id);
+                return Ok(());
+            }
+        }
+    }
+
+    return Err((StatusCode::UNAUTHORIZED, json!({"message":"Unauthorized"})));
+}
