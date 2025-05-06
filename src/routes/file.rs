@@ -13,13 +13,14 @@ use tokio_util::io::ReaderStream;
 
 use tokio::fs::File as TokioFile;
 
-use crate::{consts::UPLOAD_FOLDER_NAME, helpers::crud::create_data};
+use crate::{consts::UPLOAD_FOLDER_NAME, helpers::crud::create_data, model::toml_config::Config};
 
-pub fn file_router() -> Router {
+pub fn file_router(config: Config) -> Router<Config> {
     Router::new()
         .route("/", get(root))
         .route("/upload", post(upload))
         .route("/files/{file_name}", get(download))
+        .with_state(config)
 }
 
 async fn root() -> &'static str {

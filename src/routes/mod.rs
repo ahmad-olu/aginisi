@@ -6,7 +6,13 @@ use std::collections::HashMap;
 use axum::Json;
 use axum::extract::Path as RoutePath;
 use axum::extract::Query;
+use axum::extract::Request;
+use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::http::Method;
+use axum::http::StatusCode;
+use axum::http::header::AUTHORIZATION;
+use axum::response::IntoResponse;
 use serde_json::{Value, json};
 
 use crate::helpers::crud::create_data;
@@ -14,24 +20,74 @@ use crate::helpers::crud::delete_data;
 use crate::helpers::crud::update_data;
 use crate::helpers::json::read_json;
 use crate::model::data::Data;
+use crate::model::toml_config::AuthType;
+use crate::model::toml_config::Config;
+use crate::utils::decode_jwt::decode_jwt;
 
 pub async fn root() -> &'static str {
     "Hello, World!"
 }
 
+//impl IntoResponse
 pub async fn f_route(
+    State(state): State<Config>,
+    headers: HeaderMap,
     method: Method,
     RoutePath(path): RoutePath<String>,
     Query(params): Query<HashMap<String, String>>,
     Json(data): Json<Data>,
-) -> Json<Value> {
+) -> Result<Json<Value>, (StatusCode, Value)> {
+    if let Some(e) = state.auth {
+        match e {
+            AuthType::Jwt => match headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
+                Some(value) => {
+                    if !decode_jwt(value) {
+                        return Err((StatusCode::UNAUTHORIZED, json!({"message":"Unauthorized"})));
+                    }
+                }
+                None => {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        json!({"message":"No Authorization header found"}),
+                    ));
+                }
+            },
+            AuthType::Session => match headers.get("x-session").and_then(|v| v.to_str().ok()) {
+                Some(session) => {
+                    if let Some(values) = read_json("session").as_array() {
+                        let id = session.parse::<i64>().unwrap();
+                        let mut authorized = false;
+                        for a in values.iter() {
+                            if a.get("id") == Some(&Value::Number(id.into())) {
+                                authorized = true;
+                                break;
+                            }
+                        }
+                        if !authorized {
+                            return Err((
+                                StatusCode::UNAUTHORIZED,
+                                json!({"message":"Unauthorized"}),
+                            ));
+                        }
+                    }
+                }
+                None => {
+                    return Err((
+                        StatusCode::BAD_REQUEST,
+                        json!({"message":"No Session Id found"}),
+                    ));
+                }
+            },
+        }
+    }
+
     let split_part = || {
         let mut b = path.rsplit("/").collect::<Vec<&str>>();
         b.reverse();
         b
     };
 
-    let res: Json<Value> = match method {
+    let res: Result<Json<Value>, (StatusCode, Value)> = match method {
         Method::GET => {
             if split_part().len() == 1 {
                 let limit: usize = params
@@ -56,31 +112,31 @@ pub async fn f_route(
                         .filter(|row| filter.evaluate(row))
                         .clone()
                         .collect();
-                    return Json(json!(data));
+                    return Ok(Json(json!(data)));
                 }
                 let data: Vec<_> = json_array.iter().skip(offset).take(limit).clone().collect();
-                return Json(json!(data));
+                return Ok(Json(json!(data)));
             } else if split_part().len() == 2 {
-                return Json(json!([]));
+                return Ok(Json(json!([])));
             }
-            return Json(json!([]));
+            return Ok(Json(json!([])));
         }
         Method::POST => {
             if split_part().len() == 1 {
                 let file_name = split_part().get(0).unwrap().to_string();
                 if let Some(data) = data.data {
                     let res = create_data(&file_name, data.clone());
-                    return Json(res);
+                    return Ok(Json(res));
                 } else {
-                    return Json(json!({}));
+                    return Ok(Json(json!({})));
                 }
             } else {
-                return Json(json!({}));
+                return Ok(Json(json!({})));
             }
         }
         Method::PATCH => {
             if split_part().len() == 1 {
-                return Json(json!({}));
+                return Ok(Json(json!({})));
             } else if split_part().len() == 2 {
                 let file_name = split_part().get(0).unwrap().to_string();
                 let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
@@ -95,27 +151,27 @@ pub async fn f_route(
                             res = update_data(&file_name, id, key, value);
                         }
                     }
-                    return Json(res);
+                    return Ok(Json(res));
                 } else {
-                    return Json(json!({}));
+                    return Ok(Json(json!({})));
                 }
             } else {
-                return Json(json!({}));
+                return Ok(Json(json!({})));
             }
         }
         Method::DELETE => {
             if split_part().len() == 1 {
-                return Json(json!({}));
+                return Ok(Json(json!({})));
             } else if split_part().len() == 2 {
                 let file_name = split_part().get(0).unwrap().to_string();
                 let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
                 delete_data(&file_name, id);
-                return Json(json!({}));
+                return Ok(Json(json!({})));
             } else {
-                return Json(json!({}));
+                return Ok(Json(json!({})));
             }
         }
-        _ => Json(json!({})),
+        _ => Err((StatusCode::FORBIDDEN, json!({}))),
     };
     return res;
 }

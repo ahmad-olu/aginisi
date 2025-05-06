@@ -3,6 +3,7 @@ use std::fs::{self};
 use aginisi::cmd_args::Args;
 use aginisi::consts::{FOLDER_NAME, UPLOAD_FOLDER_NAME};
 use aginisi::docs;
+use aginisi::helpers::toml::{create_app_config, read_app_config};
 use aginisi::routes::auth::auth_router;
 use aginisi::routes::file::file_router;
 use aginisi::routes::{f_route, root};
@@ -37,11 +38,16 @@ async fn main() {
         std::process::exit(1);
     }
 
+    create_app_config();
+
+    let state = read_app_config().config;
+
     let app = Router::new()
         .route("/", get(root))
-        .nest("/auth", auth_router())
-        .nest("/file", file_router())
-        .route("/{*path}", any(f_route));
+        .nest("/auth", auth_router(state.clone()))
+        .nest("/file", file_router(state.clone()))
+        .route("/{*path}", any(f_route))
+        .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await
         .unwrap();

@@ -4,6 +4,7 @@ use argon2::{
 };
 use axum::{
     Form, Json, Router,
+    extract::State,
     routing::{get, post},
 };
 use chrono::{Duration, Utc};
@@ -13,14 +14,18 @@ use serde_json::{Value, json};
 use crate::{
     consts::{AUTH_TABLE_NAME, KEYS},
     helpers::{crud::create_data, json::read_json},
-    model::auth::{AuthBody, Claims, SignInInput, SignUpInput},
+    model::{
+        auth::{AuthBody, Claims, SignInInput, SignUpInput},
+        toml_config::{AuthType, Config},
+    },
 };
 
-pub fn auth_router() -> Router {
+pub fn auth_router(config: Config) -> Router<Config> {
     Router::new()
         .route("/", get(root))
         .route("/sign_in", post(sign_in))
         .route("/sign_up", post(sign_up))
+        .with_state(config)
 }
 
 pub async fn root() -> &'static str {
@@ -51,7 +56,10 @@ async fn sign_up(Form(input): Form<SignUpInput>) -> Json<Value> {
     return Json(res);
 }
 
-async fn sign_in(Form(input): Form<SignInInput>) -> Result<Json<AuthBody>, String> {
+async fn sign_in(
+    State(state): State<Config>,
+    Form(input): Form<SignInInput>,
+) -> Result<Json<Value>, String> {
     let mut data = read_json(AUTH_TABLE_NAME);
 
     let mut email_exist = false;
@@ -81,24 +89,45 @@ async fn sign_in(Form(input): Form<SignInInput>) -> Result<Json<AuthBody>, Strin
             return Err("email or password in incorrect".to_string());
         }
 
-        let now = Utc::now().timestamp() as usize;
-        let exp_time = now + Duration::days(7).num_seconds() as usize;
-        let issuer = "aginisi.com".to_string();
-        let claims = Claims {
-            sub: user_id.unwrap(),
-            exp: exp_time,
-            iss: issuer,
-            iat: now,
-            nbf: now,
-        };
+        if let Some(auth) = state.auth {
+            match auth {
+                AuthType::Jwt => {
+                    let now = Utc::now().timestamp() as usize;
+                    let exp_time = now + Duration::days(7).num_seconds() as usize;
+                    let issuer = "aginisi.com".to_string();
+                    let claims = Claims {
+                        sub: user_id.unwrap(),
+                        exp: exp_time,
+                        iss: issuer,
+                        iat: now,
+                        nbf: now,
+                    };
 
-        let token = encode(&Header::default(), &claims, &KEYS.encoding).unwrap();
+                    let token = encode(&Header::default(), &claims, &KEYS.encoding).unwrap();
 
-        return Ok(Json(AuthBody {
-            token_type: "Bearer".to_string(),
-            access_token: token,
-        }));
+                    // return Ok(Json(AuthBody {
+                    //     token_type: "Bearer".to_string(),
+                    //     access_token: token,
+                    // }));
+                    return Ok(Json(json!( {
+                        "token_type": "Bearer".to_string(),
+                        "access_token": token,
+                    })));
+                }
+                AuthType::Session => {
+                    let res = create_data(
+                        "session",
+                        json!({
+                            "user_id":user_id.unwrap()
+                        }),
+                    );
+                    return Ok(Json(res));
+                }
+            }
+        }
     }
 
     Err("Email does not exist".to_string())
 }
+
+async fn sign_out(State(state): State<Config>) -> Result<Json<Value>, String> {}
