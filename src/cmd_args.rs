@@ -16,7 +16,7 @@ pub struct Args {
     #[arg(
         short,
         long,
-        default_value_t = 8080,
+        default_value_t = 8090,
         help = "Port number to bind the server"
     )]
     pub port: u16,

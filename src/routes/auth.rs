@@ -63,7 +63,7 @@ async fn sign_up(Form(input): Form<SignUpInput>) -> Json<Value> {
 async fn sign_in(
     State(state): State<Config>,
     Form(input): Form<SignInInput>,
-) -> Result<Json<Value>, (StatusCode, Value)> {
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let mut data = read_json(AUTH_TABLE_NAME);
 
     let mut email_exist = false;
@@ -84,7 +84,7 @@ async fn sign_in(
         let hash = hashed_password.unwrap();
         let parsed_hash = PasswordHash::new(hash);
         if let Err(e) = parsed_hash {
-            return Err((StatusCode::BAD_REQUEST, json!({"message":""})));
+            return Err((StatusCode::BAD_REQUEST, Json(json!({"message":""}))));
         }
         if !Argon2::default()
             .verify_password(input.password.as_bytes(), &parsed_hash.unwrap())
@@ -92,7 +92,7 @@ async fn sign_in(
         {
             return Err((
                 StatusCode::BAD_REQUEST,
-                json!({"message":"email or password in incorrect"}),
+                Json(json!({"message":"email or password in incorrect"})),
             ));
         }
 
@@ -135,11 +135,11 @@ async fn sign_in(
     }
     Err((
         StatusCode::CONFLICT,
-        json!({"message":"Email does not exist"}),
+        Json(json!({"message":"Email does not exist"})),
     ))
 }
 
-async fn sign_out(
+pub async fn sign_out(
     State(state): State<Config>,
     headers: HeaderMap,
 ) -> Result<(), (StatusCode, Value)> {

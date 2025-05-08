@@ -36,19 +36,22 @@ pub async fn f_route(
     RoutePath(path): RoutePath<String>,
     Query(params): Query<HashMap<String, String>>,
     Json(data): Json<Data>,
-) -> Result<Json<Value>, (StatusCode, Value)> {
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     if let Some(e) = state.auth {
         match e {
             AuthType::Jwt => match headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
                 Some(value) => {
                     if !decode_jwt(value) {
-                        return Err((StatusCode::UNAUTHORIZED, json!({"message":"Unauthorized"})));
+                        return Err((
+                            StatusCode::UNAUTHORIZED,
+                            Json(json!({"message":"Unauthorized"})),
+                        ));
                     }
                 }
                 None => {
                     return Err((
                         StatusCode::BAD_REQUEST,
-                        json!({"message":"No Authorization header found"}),
+                        Json(json!({"message":"No Authorization header found"})),
                     ));
                 }
             },
@@ -66,7 +69,7 @@ pub async fn f_route(
                         if !authorized {
                             return Err((
                                 StatusCode::UNAUTHORIZED,
-                                json!({"message":"Unauthorized"}),
+                                Json(json!({"message":"Unauthorized"})),
                             ));
                         }
                     }
@@ -74,7 +77,7 @@ pub async fn f_route(
                 None => {
                     return Err((
                         StatusCode::BAD_REQUEST,
-                        json!({"message":"No Session Id found"}),
+                        Json(json!({"message":"No Session Id found"})),
                     ));
                 }
             },
@@ -87,7 +90,7 @@ pub async fn f_route(
         b
     };
 
-    let res: Result<Json<Value>, (StatusCode, Value)> = match method {
+    let res: Result<Json<Value>, (StatusCode, Json<Value>)> = match method {
         Method::GET => {
             if split_part().len() == 1 {
                 let limit: usize = params
@@ -171,7 +174,7 @@ pub async fn f_route(
                 return Ok(Json(json!({})));
             }
         }
-        _ => Err((StatusCode::FORBIDDEN, json!({}))),
+        _ => Err((StatusCode::FORBIDDEN, Json(json!({})))),
     };
     return res;
 }

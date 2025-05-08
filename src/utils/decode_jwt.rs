@@ -3,5 +3,6 @@ use jsonwebtoken::{Validation, decode};
 use crate::{consts::KEYS, model::auth::Claims};
 
 pub fn decode_jwt(token: &str) -> bool {
+    let token = token.strip_prefix("Bearer ").unwrap();
     decode::<Claims>(&token, &KEYS.decoding, &Validation::default()).is_ok()
 }

@@ -137,6 +137,60 @@ content-type: application/octet-stream
 
 {}
 ```
+
+### 📤 Read (GET)(AUTH)(JWT)
+```http
+GET /users
+Content-Type: application/json
+Authorization: Bearer ...
+
+{
+  "filter": {
+    "type": "Equals",
+    "key": "email",
+    "value": "jonah@gmail.com"
+  }
+}
+
+```
+
+### 📤 Read (GET)(AUTH)(JWT)
+```http
+GET /users
+Content-Type: application/json
+x-session: (Session id)
+
+
+{
+  "filter": {
+    "type": "Or",
+    "left": {
+      "type": "Equals",
+      "key": "id",
+      "value": 1
+    },
+    "right": {
+      "type": "Equals",
+      "key": "id",
+      "value": 3
+    }
+  }
+}
+```
+
+## for configuration `aginisi_config.toml`
+
+```toml
+[overview]
+name = "Aginisi"
+version = 1
+
+[config]
+port = 3000
+auth = "jwt" #"jwt" or "session" or con be empty for no auth
+
+```
+
 ---
 
 ## 🗃️ JSON Table Format

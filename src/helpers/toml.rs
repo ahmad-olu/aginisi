@@ -17,8 +17,8 @@ pub fn create_app_config() {
                 version: 1,
             },
             config: Config {
-                // auth: Some(AuthType::Jwt),
-                auth: None,
+                auth: Some(AuthType::Jwt),
+                //auth: None,
                 port: 3000,
             },
         };

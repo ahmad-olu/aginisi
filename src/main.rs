@@ -4,12 +4,14 @@ use aginisi::cmd_args::Args;
 use aginisi::consts::{FOLDER_NAME, UPLOAD_FOLDER_NAME};
 use aginisi::docs;
 use aginisi::helpers::toml::{create_app_config, read_app_config};
+use aginisi::model::filter_type::FilterType;
 use aginisi::routes::auth::auth_router;
 use aginisi::routes::file::file_router;
 use aginisi::routes::{f_route, root};
 use axum::Router;
 use axum::routing::{any, get};
 use clap::Parser;
+use serde_json::json;
 
 //-------------
 
@@ -37,6 +39,18 @@ async fn main() {
         docs::docs();
         std::process::exit(1);
     }
+
+    let filter = FilterType::And {
+        left: Box::new(FilterType::Equals {
+            key: json!("name"),
+            value: json!("Alice"),
+        }),
+        right: Box::new(FilterType::GreaterThan {
+            key: json!("age"),
+            value: json!(19),
+        }),
+    };
+    println!("{:?}", filter);
 
     create_app_config();
 

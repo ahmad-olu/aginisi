@@ -9,6 +9,7 @@ pub const AUTH_TABLE_NAME: &str = "auth";
 
 pub static KEYS: LazyLock<Keys> = LazyLock::new(|| {
     // let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
-    let secret = "asafdsfbhhsatgesayehfbasdyksaa".to_string();
+    let secret = "runRUNrunRUNrunRunRUNrunRUNrunRunRUNrunRUNrunRunRUNrunRUNrunRunRUNrunRUNrunRunRUNrunRUNrun".to_string();
+
     Keys::new(secret.as_bytes())
 });
