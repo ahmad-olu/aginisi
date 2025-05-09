@@ -2,6 +2,7 @@ pub mod auth;
 pub mod file;
 
 use std::collections::HashMap;
+use std::fs;
 
 use axum::Json;
 use axum::extract::Path as RoutePath;
@@ -24,8 +25,20 @@ use crate::model::toml_config::AuthType;
 use crate::model::toml_config::Config;
 use crate::utils::decode_jwt::decode_jwt;
 
-pub async fn root() -> &'static str {
-    "Hello, World!"
+pub async fn root() -> Json<Value> {
+    let entries = fs::read_dir("aginisi").unwrap();
+    let mut names = Vec::<String>::new();
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.is_file() {
+            if let Some(name) = path.file_name().and_then(|t| t.to_str()) {
+                names.push(name.strip_suffix(".json").unwrap().to_string());
+            }
+        }
+    }
+    Json(json!(names))
 }
 
 //impl IntoResponse

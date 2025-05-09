@@ -11,7 +11,10 @@ use aginisi::routes::{f_route, root};
 use axum::Router;
 use axum::routing::{any, get};
 use clap::Parser;
-use serde_json::json;
+use serde_json::{Value as SValue, json};
+use socketioxide::SocketIo;
+use socketioxide::extract::{Data, SocketRef};
+use socketioxide::handler::Value;
 
 //-------------
 
@@ -52,6 +55,9 @@ async fn main() {
     };
     println!("{:?}", filter);
 
+    let (layer, io) = SocketIo::new_layer();
+    io.ns("/socket", on_socket_connect);
+
     create_app_config();
 
     let state = read_app_config().config;
@@ -61,6 +67,7 @@ async fn main() {
         .nest("/auth", auth_router(state.clone()))
         .nest("/file", file_router(state.clone()))
         .route("/{*path}", any(f_route))
+        .layer(layer)
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await
@@ -71,4 +78,34 @@ async fn main() {
         listener.local_addr().unwrap()
     );
     axum::serve(listener, app).await.unwrap()
+}
+
+pub fn on_socket_connect(socket: SocketRef, Data(_data): Data<Value>) {
+    let entries = fs::read_dir(FOLDER_NAME).unwrap();
+    let mut names = Vec::<String>::new();
+    for entry in entries {
+        let entry = entry.unwrap();
+        let path = entry.path();
+
+        if path.is_file() {
+            if let Some(name) = path.file_name().and_then(|t| t.to_str()) {
+                names.push(name.strip_suffix(".json").unwrap().to_string());
+            }
+        }
+    }
+
+    for name in names {
+        socket.on(
+            name.clone(),
+            |socket: SocketRef, Data::<SValue>(value)| async move {
+                socket
+                    .broadcast()
+                    .emit(format!("to-{}", name.clone()), &value)
+                    .await
+                    .ok();
+
+                socket.emit(format!("to-{}", name.clone()), &value).ok();
+            },
+        );
+    }
 }
