@@ -15,11 +15,15 @@ use serde_json::{Value as SValue, json};
 use socketioxide::SocketIo;
 use socketioxide::extract::{Data, SocketRef};
 use socketioxide::handler::Value;
+use tracing::{debug, info};
+use tracing_subscriber::FmtSubscriber;
 
 //-------------
 
 #[tokio::main]
 async fn main() {
+    tracing::subscriber::set_global_default(FmtSubscriber::default()).unwrap();
+
     let args = Args::parse();
     if let Ok(exist) = fs::exists(FOLDER_NAME) {
         if !exist {
@@ -43,18 +47,6 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let filter = FilterType::And {
-        left: Box::new(FilterType::Equals {
-            key: json!("name"),
-            value: json!("Alice"),
-        }),
-        right: Box::new(FilterType::GreaterThan {
-            key: json!("age"),
-            value: json!(19),
-        }),
-    };
-    println!("{:?}", filter);
-
     let (layer, io) = SocketIo::new_layer();
     io.ns("/socket", on_socket_connect);
 
@@ -69,10 +61,13 @@ async fn main() {
         .route("/{*path}", any(f_route))
         .layer(layer)
         .with_state(state);
+
+    info!("Starting server");
+
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await
         .unwrap();
-    println!(
+    debug!(
         "Serving {} at http://{}",
         args.path.display(),
         listener.local_addr().unwrap()
@@ -80,7 +75,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap()
 }
 
-pub fn on_socket_connect(socket: SocketRef, Data(_data): Data<Value>) {
+pub fn on_socket_connect(socket: SocketRef, Data(data): Data<SValue>) {
+    info!("Socket.IO connected: {:?} {:?}", socket.ns(), socket.id);
+    socket.emit("ping", &data).ok();
+
     let entries = fs::read_dir(FOLDER_NAME).unwrap();
     let mut names = Vec::<String>::new();
     for entry in entries {
@@ -98,14 +96,29 @@ pub fn on_socket_connect(socket: SocketRef, Data(_data): Data<Value>) {
         socket.on(
             name.clone(),
             |socket: SocketRef, Data::<SValue>(value)| async move {
+                info!("===>{:?}", &value);
                 socket
                     .broadcast()
                     .emit(format!("to-{}", name.clone()), &value)
                     .await
                     .ok();
 
-                socket.emit(format!("to-{}", name.clone()), &value).ok();
+                //socket.emit(format!("to-{}", name.clone()), &value).ok();
             },
         );
     }
+
+    // socket.on(
+    //     "user",
+    //     |socket: SocketRef, Data::<SValue>(value)| async move {
+    //         info!("2===>{:?}", &value);
+    //         socket
+    //             .broadcast()
+    //             .emit(format!("to-{}", "user"), &value)
+    //             .await
+    //             .ok();
+
+    //         socket.emit(format!("to-{}", "user"), &value).ok();
+    //     },
+    // );
 }
