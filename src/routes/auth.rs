@@ -13,6 +13,7 @@ use jsonwebtoken::{Header, encode};
 use serde_json::{Value, json};
 
 use crate::{
+    AppState,
     consts::{AUTH_TABLE_NAME, KEYS},
     helpers::{
         crud::{create_data, delete_data},
@@ -20,11 +21,11 @@ use crate::{
     },
     model::{
         auth::{AuthBody, Claims, SignInInput, SignUpInput},
-        toml_config::{AuthType, Config},
+        toml_config::AuthType,
     },
 };
 
-pub fn auth_router(config: Config) -> Router<Config> {
+pub fn auth_router(config: AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(root))
         .route("/sign_in", post(sign_in))
@@ -61,7 +62,7 @@ async fn sign_up(Form(input): Form<SignUpInput>) -> Json<Value> {
 }
 
 async fn sign_in(
-    State(state): State<Config>,
+    State(state): State<AppState>,
     Form(input): Form<SignInInput>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let mut data = read_json(AUTH_TABLE_NAME);
@@ -96,7 +97,7 @@ async fn sign_in(
             ));
         }
 
-        if let Some(auth) = state.auth {
+        if let Some(auth) = state.config.auth {
             match auth {
                 AuthType::Jwt => {
                     let now = Utc::now().timestamp() as usize;
@@ -140,10 +141,10 @@ async fn sign_in(
 }
 
 pub async fn sign_out(
-    State(state): State<Config>,
+    State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<(), (StatusCode, Value)> {
-    if let Some(a) = state.auth {
+    if let Some(a) = state.config.auth {
         if a == AuthType::Session {
             if let Some(header) = headers.get("x-session").and_then(|v| v.to_str().ok()) {
                 let id = header.parse::<u64>().unwrap();

@@ -203,8 +203,17 @@ Each .json file should contain an array of objects, for example:
 ```
 ---
 
+## stream with socket io
+
+### subscribe to either url or url/socket e.g (http://127.0.0.1:8090/) or (http://127.0.0.1:8090/socket)
+
+1. broadcast after post request
+    when you create a `POST` request every one subscribed to the `[path]-listener` where path is the table. for example to listen to changes on posts. subscribe to `posts-listener`. would see the result of response of the post request
+
+2. specific stream with created table
+    when you send a event to table name / path e.g posts table = [posts]. every one subscribed to [to-[table name]] e.g [to-posts] were posts is a table under aginisi.
+
 ## 📡 Coming Soon
-- 🔄 Real-time change broadcasting with Socket.IO
 - 🔐 Authentication middleware
 - 📊 Schema validation & mock data generators
 - 📁 Swagger/OpenAPI generation

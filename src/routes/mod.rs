@@ -15,7 +15,10 @@ use axum::http::StatusCode;
 use axum::http::header::AUTHORIZATION;
 use axum::response::IntoResponse;
 use serde_json::{Value, json};
+use socketioxide::extract::{Data as SData, SocketRef};
+use tracing::info;
 
+use crate::AppState;
 use crate::helpers::crud::create_data;
 use crate::helpers::crud::delete_data;
 use crate::helpers::crud::update_data;
@@ -43,14 +46,20 @@ pub async fn root() -> Json<Value> {
 
 //impl IntoResponse
 pub async fn f_route(
-    State(state): State<Config>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     method: Method,
     RoutePath(path): RoutePath<String>,
     Query(params): Query<HashMap<String, String>>,
     Json(data): Json<Data>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    if let Some(e) = state.auth {
+    let io = state.socket_io.clone();
+    let post_to_socket_io = |data: Value, path: String| async move {
+        io.emit(format!("{}-listener", path), &data).await.unwrap();
+        data
+    };
+
+    if let Some(e) = state.config.auth {
         match e {
             AuthType::Jwt => match headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
                 Some(value) => {
@@ -142,6 +151,7 @@ pub async fn f_route(
                 let file_name = split_part().get(0).unwrap().to_string();
                 if let Some(data) = data.data {
                     let res = create_data(&file_name, data.clone());
+                    let res = post_to_socket_io(res, file_name).await;
                     return Ok(Json(res));
                 } else {
                     return Ok(Json(json!({})));

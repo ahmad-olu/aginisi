@@ -4,10 +4,7 @@ use std::{
     path::Path,
 };
 
-use crate::{
-    consts::FOLDER_NAME,
-    model::toml_config::{AppConfig, AuthType, Config, Overview},
-};
+use crate::model::toml_config::{AppConfig, AuthType, Config, Overview};
 
 pub fn create_app_config() {
     if !Path::new(&format!("{}.toml", "aginisi_config")).exists() {

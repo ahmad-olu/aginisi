@@ -1,13 +1,14 @@
 use std::fs::{self};
+use std::sync::Arc;
 
 use aginisi::cmd_args::Args;
 use aginisi::consts::{FOLDER_NAME, UPLOAD_FOLDER_NAME};
-use aginisi::docs;
 use aginisi::helpers::toml::{create_app_config, read_app_config};
 use aginisi::model::filter_type::FilterType;
 use aginisi::routes::auth::auth_router;
 use aginisi::routes::file::file_router;
 use aginisi::routes::{f_route, root};
+use aginisi::{AppState, docs};
 use axum::Router;
 use axum::routing::{any, get};
 use clap::Parser;
@@ -48,11 +49,15 @@ async fn main() {
     }
 
     let (layer, io) = SocketIo::new_layer();
+    io.ns("/", on_socket_connect);
     io.ns("/socket", on_socket_connect);
 
     create_app_config();
 
-    let state = read_app_config().config;
+    let state = AppState {
+        socket_io: Arc::new(io.clone()),
+        config: read_app_config().config,
+    };
 
     let app = Router::new()
         .route("/", get(root))
@@ -67,7 +72,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
         .await
         .unwrap();
-    debug!(
+    info!(
         "Serving {} at http://{}",
         args.path.display(),
         listener.local_addr().unwrap()
