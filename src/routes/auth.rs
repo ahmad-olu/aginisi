@@ -13,14 +13,14 @@ use jsonwebtoken::{Header, encode};
 use serde_json::{Value, json};
 
 use crate::{
-    AppState,
     consts::{AUTH_TABLE_NAME, KEYS},
     helpers::{
         crud::{create_data, delete_data},
         json::read_json,
     },
     model::{
-        auth::{AuthBody, Claims, SignInInput, SignUpInput},
+        app_state::AppState,
+        auth::{Claims, SignInInput, SignUpInput},
         toml_config::AuthType,
     },
 };
@@ -84,7 +84,8 @@ async fn sign_in(
     if email_exist == true {
         let hash = hashed_password.unwrap();
         let parsed_hash = PasswordHash::new(hash);
-        if let Err(e) = parsed_hash {
+
+        if let Err(_e) = parsed_hash {
             return Err((StatusCode::BAD_REQUEST, Json(json!({"message":""}))));
         }
         if !Argon2::default()

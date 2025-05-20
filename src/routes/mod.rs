@@ -7,25 +7,23 @@ use std::fs;
 use axum::Json;
 use axum::extract::Path as RoutePath;
 use axum::extract::Query;
-use axum::extract::Request;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::http::Method;
 use axum::http::StatusCode;
 use axum::http::header::AUTHORIZATION;
-use axum::response::IntoResponse;
 use serde_json::{Value, json};
-use socketioxide::extract::{Data as SData, SocketRef};
-use tracing::info;
 
-use crate::AppState;
 use crate::helpers::crud::create_data;
 use crate::helpers::crud::delete_data;
 use crate::helpers::crud::update_data;
 use crate::helpers::json::read_json;
+use crate::helpers::json::read_only_json;
+use crate::model::app_state::AppState;
 use crate::model::data::Data;
+use crate::model::data::Relation;
+use crate::model::socket_response::SocketResponse;
 use crate::model::toml_config::AuthType;
-use crate::model::toml_config::Config;
 use crate::utils::decode_jwt::decode_jwt;
 
 pub async fn root() -> Json<Value> {
@@ -54,9 +52,9 @@ pub async fn f_route(
     Json(data): Json<Data>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let io = state.socket_io.clone();
-    let post_to_socket_io = |data: Value, path: String| async move {
+    let post_to_socket_io = |data: SocketResponse, path: String| async move {
         io.emit(format!("{}-listener", path), &data).await.unwrap();
-        data
+        data.data
     };
 
     if let Some(e) = state.config.auth {
@@ -129,17 +127,48 @@ pub async fn f_route(
                 let empty_vec: Vec<Value> = vec![];
                 let json = read_json(&file_name);
                 let json_array = json.as_array().unwrap_or(&empty_vec);
-                if let Some(filter) = data.filter {
-                    let data: Vec<_> = json_array
-                        .iter()
-                        .skip(offset)
-                        .take(limit)
+
+                let json_array = json_array.iter().skip(offset).take(limit);
+
+                let enrich_with_relation = |val: &serde_json::Value, relation: Vec<Relation>| {
+                    let mut val = val.clone();
+
+                    for r in relation.iter() {
+                        let mut f_table = read_only_json(&r.table);
+                        if let Value::Array(arr) = &mut f_table {
+                            let foreign_match =
+                                arr.iter().find(|item| item.get(&r.key) == val.get(&r.key));
+
+                            if let Some(matched) = foreign_match {
+                                let to_insert = matched.clone();
+
+                                if let Value::Object(obj) = &mut val {
+                                    obj.insert(r.rep.clone().unwrap_or(r.table.clone()), to_insert);
+                                }
+                            }
+                        }
+                    }
+
+                    val
+                };
+
+                let data: Vec<serde_json::Value> = match (data.filter, data.relation) {
+                    (Some(filter), None) => json_array
                         .filter(|row| filter.evaluate(row))
-                        .clone()
-                        .collect();
-                    return Ok(Json(json!(data)));
-                }
-                let data: Vec<_> = json_array.iter().skip(offset).take(limit).clone().collect();
+                        .map(|v| v.clone())
+                        .collect(),
+                    (Some(filter), Some(relation)) => json_array
+                        .filter(|row| filter.evaluate(row))
+                        .map(|val| enrich_with_relation(val, relation.clone()))
+                        .collect(),
+                    (None, Some(relation)) => json_array
+                        .map(|val| enrich_with_relation(val, relation.clone()))
+                        .collect(),
+                    _ => json_array
+                        .map(|v| v.clone())
+                        .collect::<Vec<serde_json::Value>>(),
+                };
+
                 return Ok(Json(json!(data)));
             } else if split_part().len() == 2 {
                 return Ok(Json(json!([])));
@@ -151,7 +180,14 @@ pub async fn f_route(
                 let file_name = split_part().get(0).unwrap().to_string();
                 if let Some(data) = data.data {
                     let res = create_data(&file_name, data.clone());
-                    let res = post_to_socket_io(res, file_name).await;
+                    let res = post_to_socket_io(
+                        SocketResponse {
+                            method: "POST".to_string(),
+                            data: res,
+                        },
+                        file_name,
+                    )
+                    .await;
                     return Ok(Json(res));
                 } else {
                     return Ok(Json(json!({})));
@@ -174,7 +210,15 @@ pub async fn f_route(
                         if let Some((key, value)) = data.iter().next() {
                             let key = key;
                             let value = value.clone();
-                            res = update_data(&file_name, id, key, value);
+                            let data = update_data(&file_name, id, key, value);
+                            res = post_to_socket_io(
+                                SocketResponse {
+                                    method: "PATCH".to_string(),
+                                    data,
+                                },
+                                file_name,
+                            )
+                            .await;
                         }
                     }
                     return Ok(Json(res));
