@@ -178,6 +178,37 @@ x-session: (Session id)
 }
 ```
 
+### 📤 Read (GET)(RELATION)
+```http
+GET /org_member
+Content-Type: application/json
+x-session: (Session id)
+
+{
+  "relation": [
+    {
+      "table": "org",
+      "key": "orgId",
+      "relation_name": "organization"
+    }
+  ]
+}
+
+res
+[
+  {
+    "id": 1,
+    "orgId": 1,
+    "organization": {
+      "cretedBy": 1,
+      "id": 1,
+      "name": "org1"
+    },
+    "role": "Admin",
+    "userId": 1
+  },...
+```
+
 ## for configuration `aginisi_config.toml`
 
 ```toml

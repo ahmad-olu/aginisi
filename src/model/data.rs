@@ -15,5 +15,5 @@ pub struct Data {
 pub struct Relation {
     pub table: String,
     pub key: String, // identifier ; id ; key ;
-    pub rep: Option<String>,
+    pub relation_name: Option<String>,
 }

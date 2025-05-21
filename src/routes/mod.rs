@@ -13,6 +13,8 @@ use axum::http::Method;
 use axum::http::StatusCode;
 use axum::http::header::AUTHORIZATION;
 use serde_json::{Value, json};
+use tracing::debug;
+use tracing::info;
 
 use crate::helpers::crud::create_data;
 use crate::helpers::crud::delete_data;
@@ -137,13 +139,21 @@ pub async fn f_route(
                         let mut f_table = read_only_json(&r.table);
                         if let Value::Array(arr) = &mut f_table {
                             let foreign_match =
-                                arr.iter().find(|item| item.get(&r.key) == val.get(&r.key));
-
+                                arr.iter().find(|item| item.get("id") == val.get(&r.key));
+                            info!(
+                                "{} ==> {} ==> {:?}",
+                                &r.key,
+                                val.get("id").unwrap(),
+                                foreign_match.clone()
+                            );
                             if let Some(matched) = foreign_match {
                                 let to_insert = matched.clone();
 
                                 if let Value::Object(obj) = &mut val {
-                                    obj.insert(r.rep.clone().unwrap_or(r.table.clone()), to_insert);
+                                    obj.insert(
+                                        r.relation_name.clone().unwrap_or(r.table.clone()),
+                                        to_insert,
+                                    );
                                 }
                             }
                         }
