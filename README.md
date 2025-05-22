@@ -245,6 +245,34 @@ subscribe to either url or url/socket e.g (http://127.0.0.1:8090/) or (http://12
     when you send a event to table name / path e.g posts table = [posts]. every one subscribed to [to-[table name]] e.g [to-posts] were posts is a table under aginisi.
 
 ---
+
+## stream with websocket
+
+subscribe at `ws://127.0.0.1:8090/ws`
+1.  when you create a `POST` request every one subscribed to `ws`, would receive changes to posts. in format
+```
+{
+  "from": "http request",
+  "method": "POST",
+  "path": "post",
+  "data": {
+    "brand": "gucci 3",
+    "id": 17,
+    "item": "baggy"
+  }
+}
+```
+    - from represent the type of response
+    - method is the http type
+    - path is the table
+    - data is the data
+
+
+2. to send to ws . use json format
+```
+{ type: "ace", data: nullable }
+```
+---
 ## 📡 Coming Soon
 - websocket
 - 🔐 Authentication middleware

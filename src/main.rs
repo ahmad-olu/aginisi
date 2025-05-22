@@ -1,5 +1,4 @@
 use std::fs::{self};
-use std::sync::Arc;
 
 use aginisi::cmd_args::Args;
 use aginisi::consts::{FOLDER_NAME, UPLOAD_FOLDER_NAME};
@@ -8,14 +7,14 @@ use aginisi::helpers::toml::{create_app_config, read_app_config};
 use aginisi::model::app_state::AppState;
 use aginisi::routes::auth::auth_router;
 use aginisi::routes::file::file_router;
-use aginisi::routes::{f_route, root};
+use aginisi::routes::root::{f_route, root as nRoot};
+use aginisi::routes::websocket::ws_handler;
 use aginisi::socket_io::on_socket_connect;
 use axum::Router;
 use axum::routing::{any, get};
 use clap::Parser;
-use serde_json::Value as SValue;
 use socketioxide::SocketIo;
-use socketioxide::extract::{Data, SocketRef};
+use tokio::sync::broadcast;
 use tracing::info;
 use tracing_subscriber::FmtSubscriber;
 
@@ -52,15 +51,20 @@ async fn main() {
     io.ns("/", on_socket_connect);
     io.ns("/socket", on_socket_connect);
 
+    let (tx, _rx) = broadcast::channel(5);
+
     create_app_config();
 
     let state = AppState {
-        socket_io: Arc::new(io.clone()),
+        // socket_io: Arc::new(io.clone()),
+        socket_io: io.clone(),
         config: read_app_config().config,
+        ws: tx,
     };
 
     let app = Router::new()
-        .route("/", get(root))
+        .route("/", get(nRoot))
+        .route("/ws", get(ws_handler))
         .nest("/auth", auth_router(state.clone()))
         .nest("/file", file_router(state.clone()))
         .route("/{*path}", any(f_route))
