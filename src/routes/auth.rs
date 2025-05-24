@@ -5,7 +5,7 @@ use argon2::{
 use axum::{
     Form, Json, Router,
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     routing::{get, post},
 };
 use chrono::{Duration, Utc};
@@ -21,6 +21,7 @@ use crate::{
     model::{
         app_state::AppState,
         auth::{Claims, SignInInput, SignUpInput},
+        error::Error,
         toml_config::AuthType,
     },
 };
@@ -37,7 +38,7 @@ pub async fn root() -> &'static str {
     "Hello, World!"
 }
 
-async fn sign_up(Form(input): Form<SignUpInput>) -> Json<Value> {
+async fn sign_up(Form(input): Form<SignUpInput>) -> Result<Json<Value>, Error> {
     let argon2 = Argon2::default();
     let salt = SaltString::generate(&mut OsRng);
     let password_hash = argon2
@@ -52,20 +53,20 @@ async fn sign_up(Form(input): Form<SignUpInput>) -> Json<Value> {
             "email": input.email,
             "password_hash": password_hash
         }),
-    );
+    )?;
 
     if let Some(auth) = res.as_object_mut() {
         auth.remove("password_hash");
         //auth["id"] = Value::Null;
     }
-    return Json(res);
+    return Ok(Json(res));
 }
 
 async fn sign_in(
     State(state): State<AppState>,
     Form(input): Form<SignInInput>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let mut data = read_json(AUTH_TABLE_NAME);
+) -> Result<Json<Value>, Error> {
+    let mut data = read_json(AUTH_TABLE_NAME)?;
 
     let mut email_exist = false;
     let mut user_id: Option<i64> = None;
@@ -86,16 +87,15 @@ async fn sign_in(
         let parsed_hash = PasswordHash::new(hash);
 
         if let Err(_e) = parsed_hash {
-            return Err((StatusCode::BAD_REQUEST, Json(json!({"message":""}))));
+            return Err(Error::BadRequest(None));
         }
         if !Argon2::default()
             .verify_password(input.password.as_bytes(), &parsed_hash.unwrap())
             .is_ok()
         {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                Json(json!({"message":"email or password in incorrect"})),
-            ));
+            return Err(Error::BadRequest(Some(
+                "email or password in incorrect".to_string(),
+            )));
         }
 
         if let Some(auth) = state.config.auth {
@@ -129,31 +129,25 @@ async fn sign_in(
                         json!({
                             "user_id":user_id.unwrap()
                         }),
-                    );
+                    )?;
                     return Ok(Json(res));
                 }
             }
         }
     }
-    Err((
-        StatusCode::CONFLICT,
-        Json(json!({"message":"Email does not exist"})),
-    ))
+    Err(Error::EmailDoesNotExist)
 }
 
-pub async fn sign_out(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Result<(), (StatusCode, Value)> {
+pub async fn sign_out(State(state): State<AppState>, headers: HeaderMap) -> Result<(), Error> {
     if let Some(a) = state.config.auth {
         if a == AuthType::Session {
             if let Some(header) = headers.get("x-session").and_then(|v| v.to_str().ok()) {
                 let id = header.parse::<u64>().unwrap();
-                delete_data("session", id);
+                delete_data("session", id)?;
                 return Ok(());
             }
         }
     }
 
-    return Err((StatusCode::UNAUTHORIZED, json!({"message":"Unauthorized"})));
+    return Err(Error::Unauthorized);
 }

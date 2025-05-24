@@ -1,10 +1,12 @@
 use serde_json::{Value, json};
 
+use crate::model::error::Error;
+
 use super::json::{read_json, write_to_json};
 
 // ! create data
-pub fn create_data(file_name: &str, mut item: Value) -> Value {
-    let mut data = read_json(file_name);
+pub fn create_data(file_name: &str, mut item: Value) -> Result<Value, Error> {
+    let mut data = read_json(file_name)?;
     if let Value::Array(arr) = &mut data {
         let next_id = arr
             .iter()
@@ -20,10 +22,10 @@ pub fn create_data(file_name: &str, mut item: Value) -> Value {
             }
         }
         arr.push(item.clone());
-        write_to_json(file_name, &data);
-        return item;
+        write_to_json(file_name, &data)?;
+        return Ok(item);
     }
-    return json!({});
+    return Ok(json!({}));
 
     // if let Value::Object(map) = &mut data {
     //     map.insert("1".to_string(), item);
@@ -31,8 +33,8 @@ pub fn create_data(file_name: &str, mut item: Value) -> Value {
 }
 
 // ! update data
-pub fn update_data(file_name: &str, id: u64, key: &str, new_value: Value) -> Value {
-    let mut data = read_json(file_name);
+pub fn update_data(file_name: &str, id: u64, key: &str, new_value: Value) -> Result<Value, Error> {
+    let mut data = read_json(file_name)?;
     let mut res = json!({});
     if let Value::Array(arr) = &mut data {
         for obj in arr.iter_mut() {
@@ -41,18 +43,19 @@ pub fn update_data(file_name: &str, id: u64, key: &str, new_value: Value) -> Val
                 res = obj.clone();
             }
         }
-        write_to_json(file_name, &data);
+        write_to_json(file_name, &data)?;
 
-        return res;
+        return Ok(res);
     } else {
-        return json!({});
+        return Ok(json!({}));
     }
 }
 // ! delete data
-pub fn delete_data(file_name: &str, id: u64) {
-    let mut data = read_json(file_name);
+pub fn delete_data(file_name: &str, id: u64) -> Result<(), Error> {
+    let mut data = read_json(file_name)?;
     if let Value::Array(arr) = &mut data {
         arr.retain(|obj| obj.get("id") != Some(&Value::Number(id.into())));
-        write_to_json(file_name, &data);
+        write_to_json(file_name, &data)?;
     }
+    Ok(())
 }

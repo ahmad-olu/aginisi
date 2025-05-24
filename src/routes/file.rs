@@ -16,7 +16,7 @@ use tokio::fs::File as TokioFile;
 use crate::{
     consts::UPLOAD_FOLDER_NAME,
     helpers::crud::create_data,
-    model::{app_state::AppState, toml_config::Config},
+    model::{app_state::AppState, error::Error},
 };
 
 pub fn file_router(config: AppState) -> Router<AppState> {
@@ -31,7 +31,7 @@ async fn root() -> &'static str {
     "Hello, World!"
 }
 
-async fn upload(mut multipart: Multipart) -> impl IntoResponse {
+async fn upload(mut multipart: Multipart) -> Result<impl IntoResponse, Error> {
     let mut name = String::new();
     while let Some(field) = multipart.next_field().await.unwrap() {
         let file_name = field.file_name().unwrap_or("upload.bin").to_string();
@@ -46,8 +46,8 @@ async fn upload(mut multipart: Multipart) -> impl IntoResponse {
         json!({
             "file_name": name,
         }),
-    );
-    StatusCode::OK
+    )?;
+    Ok(StatusCode::OK)
 }
 
 async fn download(Path(file_name): Path<String>) -> impl IntoResponse {

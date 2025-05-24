@@ -7,7 +7,6 @@ use axum::extract::Query;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::http::Method;
-use axum::http::StatusCode;
 use axum::http::header::AUTHORIZATION;
 use serde_json::{Value, json};
 use tracing::info;
@@ -20,6 +19,7 @@ use crate::helpers::json::read_only_json;
 use crate::model::app_state::AppState;
 use crate::model::data::Data;
 use crate::model::data::Relation;
+use crate::model::error::Error;
 use crate::model::socket_response::SocketResponse;
 use crate::model::socket_response::WebSocketResponse;
 use crate::model::toml_config::AuthType;
@@ -49,7 +49,7 @@ pub async fn f_route(
     RoutePath(path): RoutePath<String>,
     Query(params): Query<HashMap<String, String>>,
     Json(data): Json<Data>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+) -> Result<Json<Value>, Error> {
     let io = state.socket_io.clone();
     let post_to_socket_io = |data: SocketResponse, path: String| async move {
         io.emit(format!("{}-listener", path), &data).await.unwrap();
@@ -75,22 +75,18 @@ pub async fn f_route(
             AuthType::Jwt => match headers.get(AUTHORIZATION).and_then(|v| v.to_str().ok()) {
                 Some(value) => {
                     if !decode_jwt(value) {
-                        return Err((
-                            StatusCode::UNAUTHORIZED,
-                            Json(json!({"message":"Unauthorized"})),
-                        ));
+                        return Err(Error::Unauthorized);
                     }
                 }
                 None => {
-                    return Err((
-                        StatusCode::BAD_REQUEST,
-                        Json(json!({"message":"No Authorization header found"})),
-                    ));
+                    return Err(Error::BadRequest(Some(String::from(
+                        "No Authorization header found",
+                    ))));
                 }
             },
             AuthType::Session => match headers.get("x-session").and_then(|v| v.to_str().ok()) {
                 Some(session) => {
-                    if let Some(values) = read_json("session").as_array() {
+                    if let Some(values) = read_json("session")?.as_array() {
                         let id = session.parse::<u64>().unwrap();
                         let mut authorized = false;
                         for a in values.iter() {
@@ -100,18 +96,12 @@ pub async fn f_route(
                             }
                         }
                         if !authorized {
-                            return Err((
-                                StatusCode::UNAUTHORIZED,
-                                Json(json!({"message":"Unauthorized"})),
-                            ));
+                            return Err(Error::Unauthorized);
                         }
                     }
                 }
                 None => {
-                    return Err((
-                        StatusCode::BAD_REQUEST,
-                        Json(json!({"message":"No Session Id found"})),
-                    ));
+                    return Err(Error::BadRequest(Some(String::from("No Session Id found"))));
                 }
             },
         }
@@ -123,7 +113,7 @@ pub async fn f_route(
         b
     };
 
-    let res: Result<Json<Value>, (StatusCode, Json<Value>)> = match method {
+    let res: Result<Json<Value>, Error> = match method {
         Method::GET => {
             if split_part().len() == 1 {
                 let limit: usize = params
@@ -138,46 +128,48 @@ pub async fn f_route(
                     .unwrap();
                 let file_name = split_part().get(0).unwrap().to_string();
                 let empty_vec: Vec<Value> = vec![];
-                let json = read_json(&file_name);
+                let json = read_json(&file_name)?;
                 let json_array = json.as_array().unwrap_or(&empty_vec);
 
                 let json_array = json_array.iter().skip(offset).take(limit);
 
-                let enrich_with_relation = |val: &serde_json::Value, relation: Vec<Relation>| {
-                    let mut val = val.clone();
+                let enrich_with_relation =
+                    |val: &serde_json::Value, relation: Vec<Relation>| -> Result<Value, Error> {
+                        let mut val = val.clone();
 
-                    for r in relation.iter() {
-                        let mut f_table = read_only_json(&r.table);
-                        if let Value::Array(arr) = &mut f_table {
-                            let foreign_match =
-                                arr.iter().find(|item| item.get("id") == val.get(&r.key));
-                            info!(
-                                "{} ==> {} ==> {:?}",
-                                &r.key,
-                                val.get("id").unwrap(),
-                                foreign_match.clone()
-                            );
-                            if let Some(matched) = foreign_match {
-                                let to_insert = matched.clone();
+                        for r in relation.iter() {
+                            let mut f_table = read_only_json(&r.table)?;
+                            if let Value::Array(arr) = &mut f_table {
+                                let foreign_match =
+                                    arr.iter().find(|item| item.get("id") == val.get(&r.key));
+                                info!(
+                                    "{} ==> {} ==> {:?}",
+                                    &r.key,
+                                    val.get("id").unwrap(),
+                                    foreign_match.clone()
+                                );
+                                if let Some(matched) = foreign_match {
+                                    let to_insert = matched.clone();
 
-                                if let Value::Object(obj) = &mut val {
-                                    obj.insert(
-                                        r.relation_name.clone().unwrap_or(r.table.clone()),
-                                        to_insert,
-                                    );
+                                    if let Value::Object(obj) = &mut val {
+                                        obj.insert(
+                                            r.relation_name.clone().unwrap_or(r.table.clone()),
+                                            to_insert,
+                                        );
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    val
-                };
+                        Ok(val)
+                    };
 
-                let data: Vec<serde_json::Value> = match (data.filter, data.relation) {
-                    (Some(filter), None) => json_array
+                let data: Result<Vec<serde_json::Value>, Error> = match (data.filter, data.relation)
+                {
+                    (Some(filter), None) => Ok(json_array
                         .filter(|row| filter.evaluate(row))
                         .map(|v| v.clone())
-                        .collect(),
+                        .collect()),
                     (Some(filter), Some(relation)) => json_array
                         .filter(|row| filter.evaluate(row))
                         .map(|val| enrich_with_relation(val, relation.clone()))
@@ -185,12 +177,15 @@ pub async fn f_route(
                     (None, Some(relation)) => json_array
                         .map(|val| enrich_with_relation(val, relation.clone()))
                         .collect(),
-                    _ => json_array
+                    _ => Ok(json_array
                         .map(|v| v.clone())
-                        .collect::<Vec<serde_json::Value>>(),
+                        .collect::<Vec<serde_json::Value>>()),
                 };
 
-                return Ok(Json(json!(data)));
+                return match data {
+                    Ok(o) => Ok(Json(json!(o))),
+                    Err(e) => Err(e),
+                };
             } else if split_part().len() == 2 {
                 return Ok(Json(json!([])));
             }
@@ -200,7 +195,7 @@ pub async fn f_route(
             if split_part().len() == 1 {
                 let file_name = split_part().get(0).unwrap().to_string();
                 if let Some(data) = data.data {
-                    let res = create_data(&file_name, data.clone());
+                    let res = create_data(&file_name, data.clone())?;
                     post_to_web_socket(res.clone(), file_name.to_string(), "POST".to_string())
                         .await;
                     let res = post_to_socket_io(
@@ -234,7 +229,7 @@ pub async fn f_route(
                         if let Some((key, value)) = data.iter().next() {
                             let key = key;
                             let value = value.clone();
-                            let data = update_data(&file_name, id, key, value);
+                            let data = update_data(&file_name, id, key, value)?;
                             post_to_web_socket(
                                 res.clone(),
                                 file_name.to_string(),
@@ -265,13 +260,13 @@ pub async fn f_route(
             } else if split_part().len() == 2 {
                 let file_name = split_part().get(0).unwrap().to_string();
                 let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
-                delete_data(&file_name, id);
+                delete_data(&file_name, id)?;
                 return Ok(Json(json!({})));
             } else {
                 return Ok(Json(json!({})));
             }
         }
-        _ => Err((StatusCode::FORBIDDEN, Json(json!({})))),
+        _ => Err(Error::Forbidden),
     };
     return res;
 }
