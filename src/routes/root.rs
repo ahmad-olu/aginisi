@@ -25,11 +25,11 @@ use crate::model::socket_response::WebSocketResponse;
 use crate::model::toml_config::AuthType;
 use crate::utils::decode_jwt::decode_jwt;
 
-pub async fn root() -> Json<Value> {
+pub async fn root() -> Result<Json<Value>, Error> {
     let entries = fs::read_dir("aginisi").unwrap();
     let mut names = Vec::<String>::new();
     for entry in entries {
-        let entry = entry.unwrap();
+        let entry = entry?;
         let path = entry.path();
 
         if path.is_file() {
@@ -38,7 +38,7 @@ pub async fn root() -> Json<Value> {
             }
         }
     }
-    Json(json!(names))
+    Ok(Json(json!(names)))
 }
 
 //impl IntoResponse

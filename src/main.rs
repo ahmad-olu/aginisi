@@ -5,6 +5,7 @@ use aginisi::consts::{FOLDER_NAME, UPLOAD_FOLDER_NAME};
 use aginisi::docs;
 use aginisi::helpers::toml::{create_app_config, read_app_config};
 use aginisi::model::app_state::AppState;
+use aginisi::model::error::Error;
 use aginisi::routes::auth::auth_router;
 use aginisi::routes::file::file_router;
 use aginisi::routes::root::{f_route, root as nRoot};
@@ -21,19 +22,19 @@ use tracing_subscriber::FmtSubscriber;
 //-------------
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Error> {
     tracing::subscriber::set_global_default(FmtSubscriber::default()).unwrap();
 
     let args = Args::parse();
     if let Ok(exist) = fs::exists(FOLDER_NAME) {
         if !exist {
-            fs::create_dir(FOLDER_NAME).unwrap();
+            fs::create_dir(FOLDER_NAME)?;
         }
     }
 
     if let Ok(exist) = fs::exists(UPLOAD_FOLDER_NAME) {
         if !exist {
-            fs::create_dir(UPLOAD_FOLDER_NAME).unwrap();
+            fs::create_dir(UPLOAD_FOLDER_NAME)?;
         }
     }
 
@@ -73,13 +74,12 @@ async fn main() {
 
     info!("Starting server");
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port))
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port)).await?;
     info!(
         "Serving {} at http://{}",
         args.path.display(),
-        listener.local_addr().unwrap()
+        listener.local_addr()?
     );
-    axum::serve(listener, app).await.unwrap()
+    axum::serve(listener, app).await?;
+    Ok(())
 }

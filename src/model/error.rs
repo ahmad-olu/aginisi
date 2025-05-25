@@ -18,6 +18,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum Error {
     InternalServerError,
     Forbidden,
