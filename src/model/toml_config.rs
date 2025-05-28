@@ -21,6 +21,6 @@ pub struct Overview {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
-    pub port: u16,
+    pub port: Option<u16>,
     pub auth: Option<AuthType>,
 }

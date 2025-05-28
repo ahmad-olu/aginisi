@@ -56,10 +56,12 @@ async fn main() -> Result<(), Error> {
 
     create_app_config();
 
+    let app_config = read_app_config();
+
     let state = AppState {
         // socket_io: Arc::new(io.clone()),
         socket_io: io.clone(),
-        config: read_app_config().config,
+        config: app_config.config.clone(),
         ws: tx,
     };
 
@@ -74,7 +76,9 @@ async fn main() -> Result<(), Error> {
 
     info!("Starting server");
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", args.port)).await?;
+    let port = app_config.config.port.unwrap_or_else(|| args.port); // ! app config takes precedence over cli arg
+
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
     info!(
         "Serving {} at http://{}",
         args.path.display(),
