@@ -23,7 +23,8 @@ List<String> sampleAuthors = [
 
 Thread generateRandomThread() {
   return Thread(
-    id: _uuid.v4(),
+    //id: _uuid.v4(),
+    id: 0,
     title: sampleTitles[_random.nextInt(sampleTitles.length)],
     author: sampleAuthors[_random.nextInt(sampleAuthors.length)],
     contentId: _uuid.v4(),

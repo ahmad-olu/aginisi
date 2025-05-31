@@ -25,7 +25,7 @@ AuthInput _$AuthInputFromJson(Map<String, dynamic> json) => AuthInput(
 );
 
 Map<String, dynamic> _$AuthInputToJson(AuthInput instance) => <String, dynamic>{
-  'name': instance.name,
+  if (instance.name case final value?) 'name': value,
   'email': instance.email,
   'password': instance.password,
 };
@@ -172,7 +172,7 @@ Map<String, dynamic> _$TodoToJson(Todo instance) => <String, dynamic>{
 };
 
 Thread _$ThreadFromJson(Map<String, dynamic> json) => Thread(
-  id: (json['id'] as num).toInt(),
+  id: (json['id'] as num?)?.toInt(),
   title: json['title'] as String,
   author: json['author'] as String,
   contentId: json['contentId'] as String,
@@ -192,26 +192,24 @@ Map<String, dynamic> _$ThreadToJson(Thread instance) => <String, dynamic>{
   'content': instance.content,
 };
 
-Content _$ContentFromJson(Map<String, dynamic> json) => Content();
-
-Map<String, dynamic> _$ContentToJson(Content instance) => <String, dynamic>{};
-
-TextContent _$TextContentFromJson(Map<String, dynamic> json) =>
-    TextContent(text: json['text'] as String);
-
-Map<String, dynamic> _$TextContentToJson(TextContent instance) =>
-    <String, dynamic>{'text': instance.text};
-
-ImageContent _$ImageContentFromJson(Map<String, dynamic> json) =>
-    ImageContent(imageUrl: json['imageUrl'] as String);
-
-Map<String, dynamic> _$ImageContentToJson(ImageContent instance) =>
-    <String, dynamic>{'imageUrl': instance.imageUrl};
-
-LinkContent _$LinkContentFromJson(Map<String, dynamic> json) => LinkContent(
-  url: json['url'] as String,
+Content _$ContentFromJson(Map<String, dynamic> json) => Content(
+  text: json['text'] as String?,
+  type: $enumDecode(_$ContentTypeEnumMap, json['type']),
+  imageUrl: json['imageUrl'] as String?,
+  url: json['url'] as String?,
   preview: json['preview'] as String?,
 );
 
-Map<String, dynamic> _$LinkContentToJson(LinkContent instance) =>
-    <String, dynamic>{'url': instance.url, 'preview': instance.preview};
+Map<String, dynamic> _$ContentToJson(Content instance) => <String, dynamic>{
+  'type': _$ContentTypeEnumMap[instance.type]!,
+  'text': instance.text,
+  'imageUrl': instance.imageUrl,
+  'url': instance.url,
+  'preview': instance.preview,
+};
+
+const _$ContentTypeEnumMap = {
+  ContentType.text: 'text',
+  ContentType.image: 'image',
+  ContentType.link: 'link',
+};

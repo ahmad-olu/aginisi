@@ -1,4 +1,7 @@
 import 'package:http/http.dart' as http;
+//import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:localstorage/localstorage.dart';
+
 import 'dart:convert';
 
 import 'package:showcase/model/all.dart';
@@ -9,40 +12,57 @@ enum ReqMethod { get, post, patch, delete }
 
 const contentT = ['application/json', 'application/x-www-form-urlencoded'];
 
-Future<void> register(AuthInput authInput) async {
-  final response = await _fetch(
-    path: "auth/sign_up",
-    body: authInput.toJson(),
-    contentType: contentT[1],
-  );
-
-  if (response.statusCode == 200) {
-  } else {
-    throw Exception('Internal server error');
-  }
-}
-
-Future<AuthBody> signInJwt(AuthInput authInput) async {
-  final response = await _fetch(
-    path: "auth/sign_in",
-    body: authInput.toJson(),
-    contentType: contentT[1],
-  );
-
-  if (response.statusCode == 200) {
-    final data = json.decode(response.body) as Map<String, dynamic>;
-
-    return AuthBody(
-      tokenType: data['token_type'],
-      accessToken: data['access_token'],
-      refreshToken: data['refresh_token'],
+Future<bool> register(AuthInput authInput) async {
+  try {
+    final response = await _fetch(
+      path: "auth/sign_up",
+      body: authInput.toJson(),
+      contentType: contentT[1],
     );
-  } else {
-    throw Exception('Internal server error');
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      throw Exception('Internal server error');
+    }
+  } catch (e) {
+    return false;
   }
 }
 
-Future<(String, String)> signInSession(AuthInput authInput) async {
+Future<bool> signInJwt(AuthInput authInput) async {
+  try {
+    final body = authInput.toJson()..remove("name");
+    final response = await _fetch(
+      path: "auth/sign_in",
+      body: body,
+      // body: {"email": authInput.email, "password": authInput.password},
+      contentType: contentT[1],
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+
+      // final a = AuthBody(
+      //   tokenType: data['token_type'],
+      //   accessToken: data['access_token'],
+      //   refreshToken: data['refresh_token'],
+      // );
+      // final storage = FlutterSecureStorage();
+      // await storage.write(key: 'access_token', value: data['access_token']);
+      // await storage.write(key: 'refresh_token', value: data['refresh_token']);
+      localStorage.setItem('access_token', data['access_token']);
+      localStorage.setItem('refresh_token', data['refresh_token'] ?? '');
+      return true;
+    } else {
+      throw Exception('Internal server error');
+    }
+  } catch (e) {
+    print('error ==> $e');
+    return false;
+  }
+}
+
+Future<bool> signInSession(AuthInput authInput) async {
   final response = await _fetch(
     path: "auth/sign_in",
     body: authInput.toJson(),
@@ -52,7 +72,13 @@ Future<(String, String)> signInSession(AuthInput authInput) async {
   if (response.statusCode == 200) {
     final data = json.decode(response.body) as Map<String, dynamic>;
 
-    return (data['id'] as String, data['user_id'] as String);
+    // return (data['id'] as String, data['user_id'] as String);
+    // final storage = FlutterSecureStorage();
+    // await storage.write(key: 'x-session', value: data['id']);
+
+    localStorage.setItem('x-session', data['id']);
+    print('error');
+    return true;
   } else {
     throw Exception('Internal server error');
   }
@@ -128,13 +154,14 @@ Future<http.Response> _fetch({
     ReqMethod.post || null => await http.post(
       url,
       headers: {'Content-Type': contentType ?? contentT[0]},
-      body: jsonEncode(body),
+      //   body: jsonEncode(body),
+      body: body,
     ),
 
     ReqMethod.patch => await http.patch(
       url,
       headers: {'Content-Type': contentT[0]},
-      body: jsonEncode(body),
+      body: body,
     ),
 
     ReqMethod.delete => await http.delete(

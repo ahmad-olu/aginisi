@@ -21,6 +21,7 @@ class AuthBody {
 
 @JsonSerializable()
 class AuthInput {
+  @JsonKey(includeIfNull: false)
   final String? name;
   final String email;
   final String password;
@@ -165,15 +166,16 @@ class Todo {
 
 @JsonSerializable()
 class Thread {
-  final int id;
+  final int? id;
   final String title;
   final String author;
   final String contentId;
   final DateTime createdAt;
+  // final Content? content;
   final Content? content;
 
   Thread({
-    required this.id,
+    this.id,
     required this.title,
     required this.author,
     required this.contentId,
@@ -186,72 +188,25 @@ class Thread {
   Map<String, dynamic> toJson() => _$ThreadToJson(this);
 }
 
-@JsonSerializable(explicitToJson: true)
-@ContentTypeConverter()
-sealed class Content {
-  const Content();
-}
+enum ContentType { text, image, link }
 
 @JsonSerializable()
-class TextContent extends Content {
-  final String text;
-
-  const TextContent({required this.text});
-
-  factory TextContent.fromJson(Map<String, dynamic> json) =>
-      _$TextContentFromJson(json);
-  Map<String, dynamic> toJson() => _$TextContentToJson(this);
-}
-
-@JsonSerializable()
-class ImageContent extends Content {
-  final String imageUrl;
-
-  const ImageContent({required this.imageUrl});
-
-  factory ImageContent.fromJson(Map<String, dynamic> json) =>
-      _$ImageContentFromJson(json);
-  Map<String, dynamic> toJson() => _$ImageContentToJson(this);
-}
-
-@JsonSerializable()
-class LinkContent extends Content {
-  final String url;
+class Content {
+  final ContentType type;
+  final String? text;
+  final String? imageUrl;
+  final String? url;
   final String? preview;
 
-  const LinkContent({required this.url, this.preview});
+  const Content({
+    this.text,
+    required this.type,
+    this.imageUrl,
+    this.url,
+    this.preview,
+  });
 
-  factory LinkContent.fromJson(Map<String, dynamic> json) =>
-      _$LinkContentFromJson(json);
-  Map<String, dynamic> toJson() => _$LinkContentToJson(this);
-}
-
-class ContentTypeConverter
-    implements JsonConverter<Content, Map<String, dynamic>> {
-  const ContentTypeConverter();
-
-  @override
-  Content fromJson(Map<String, dynamic> json) {
-    final type = json['type'];
-    switch (type) {
-      case 'text':
-        return TextContent.fromJson(json);
-      case 'image':
-        return ImageContent.fromJson(json);
-      case 'link':
-        return LinkContent.fromJson(json);
-      default:
-        throw UnsupportedError('Unknown content type: $type');
-    }
-  }
-
-  @override
-  Map<String, dynamic> toJson(Content content) {
-    final json = switch (content) {
-      TextContent tc => tc.toJson()..['type'] = 'text',
-      ImageContent ic => ic.toJson()..['type'] = 'image',
-      LinkContent lc => lc.toJson()..['type'] = 'link',
-    };
-    return json;
-  }
+  factory Content.fromJson(Map<String, dynamic> json) =>
+      _$ContentFromJson(json);
+  Map<String, dynamic> toJson() => _$ContentToJson(this);
 }

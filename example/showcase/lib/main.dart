@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:localstorage/localstorage.dart';
 import 'package:routemaster/routemaster.dart';
 import 'package:showcase/route/route.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await initLocalStorage();
+
   runApp(const MainApp());
 }
 
