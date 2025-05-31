@@ -11,6 +11,7 @@ use axum::{
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Header, encode};
 use serde_json::{Value, json};
+use tracing::info;
 
 use crate::{
     consts::{AUTH_TABLE_NAME, KEYS},
@@ -81,7 +82,6 @@ async fn sign_in(
             }
         }
     }
-
     if email_exist == true {
         let hash = hashed_password.unwrap();
         let parsed_hash = PasswordHash::new(hash);
@@ -102,7 +102,8 @@ async fn sign_in(
             match auth {
                 AuthType::Jwt => {
                     let now = Utc::now().timestamp() as usize;
-                    let exp_time = now + Duration::days(7).num_seconds() as usize;
+                    // let exp_time = now + Duration::days(7).num_seconds() as usize;
+                    let exp_time = now + Duration::seconds(17).num_seconds() as usize;
                     let issuer = "aginisi.com".to_string();
                     let claims = Claims {
                         sub: user_id.unwrap(),
@@ -133,6 +134,8 @@ async fn sign_in(
                     return Ok(Json(res));
                 }
             }
+        } else {
+            return Ok(Json(Value::Null));
         }
     }
     Err(Error::EmailDoesNotExist)

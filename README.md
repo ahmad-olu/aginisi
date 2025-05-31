@@ -154,7 +154,7 @@ Authorization: Bearer ...
 
 ```
 
-### 📤 Read (GET)(AUTH)(JWT)
+### 📤 Read (GET)(AUTH)(Session)
 ```http
 GET /users
 Content-Type: application/json
