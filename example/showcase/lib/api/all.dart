@@ -95,7 +95,7 @@ Future<Data<Post>> createPost(Post postInput) async {
   }
 }
 
-Future<List> getPosts() async {
+Future<List<Data<Post>>> getPosts() async {
   final response = await _fetch(path: "post", method: ReqMethod.get);
 
   if (response.statusCode == 200) {
@@ -141,6 +141,7 @@ Future<http.Response> _fetch({
   required String path,
   ReqMethod? method = ReqMethod.post,
   Map<String, dynamic>? body,
+  Map<String, String>? headers,
   String? contentType,
 }) async {
   final url = Uri.parse('$baseurl/$path');
@@ -148,25 +149,25 @@ Future<http.Response> _fetch({
   return switch (method) {
     ReqMethod.get => await http.get(
       url,
-      headers: {'Content-Type': contentType ?? contentT[0]},
+      headers: {'Content-Type': contentType ?? contentT[0], ...headers ?? {}},
     ),
 
     ReqMethod.post || null => await http.post(
       url,
-      headers: {'Content-Type': contentType ?? contentT[0]},
+      headers: {'Content-Type': contentType ?? contentT[0], ...headers ?? {}},
       //   body: jsonEncode(body),
       body: body,
     ),
 
     ReqMethod.patch => await http.patch(
       url,
-      headers: {'Content-Type': contentT[0]},
+      headers: {'Content-Type': contentT[0], ...headers ?? {}},
       body: body,
     ),
 
     ReqMethod.delete => await http.delete(
       url,
-      headers: {'Content-Type': contentType ?? contentT[0]},
+      headers: {'Content-Type': contentType ?? contentT[0], ...headers ?? {}},
     ),
   };
 
@@ -190,7 +191,26 @@ Future<http.Response> _fetch({
   // }
 }
 
-void getAccessToken() async {
-  final refresh = '';
-  await _fetch(path: 'refresh');
+Future<bool> getAccessToken() async {
+  final refresh = localStorage.getItem("refresh_token");
+  if (refresh == null) {
+    return false;
+  }
+  try {
+    final response = await _fetch(
+      path: 'refresh',
+      headers: {'x-refresh': 'Bearer $refresh'},
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      localStorage.setItem('access_token', data['access_token']);
+      localStorage.setItem('refresh_token', data['refresh_token'] ?? '');
+      return true;
+    } else {
+      throw Exception('Internal server error');
+    }
+  } catch (e) {
+    print('error ==> $e');
+    return false;
+  }
 }
