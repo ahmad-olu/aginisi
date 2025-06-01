@@ -254,19 +254,21 @@ pub async fn f_route(
                 return Ok(Json(json!({})));
             }
         }
-        Method::DELETE => {
-            if split_part().len() == 1 {
-                return Ok(Json(json!({})));
-            } else if split_part().len() == 2 {
-                let file_name = split_part().get(0).unwrap().to_string();
-                let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
-                delete_data(&file_name, id)?;
-                return Ok(Json(json!({})));
-            } else {
-                return Ok(Json(json!({})));
-            }
-        }
+        Method::DELETE => delete(split_part),
         _ => Err(Error::Forbidden),
     };
     return res;
+}
+
+fn delete<'a>(split_part: impl Fn() -> Vec<&'a str>) -> Result<Json<Value>, Error> {
+    if split_part().len() == 1 {
+        return Ok(Json(json!({})));
+    } else if split_part().len() == 2 {
+        let file_name = split_part().get(0).unwrap().to_string();
+        let id: u64 = split_part().get(1).unwrap().to_string().parse().unwrap();
+        delete_data(&file_name, id)?;
+        return Ok(Json(json!({})));
+    } else {
+        return Ok(Json(json!({})));
+    }
 }

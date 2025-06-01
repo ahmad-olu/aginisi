@@ -11,7 +11,6 @@ use axum::{
 use chrono::{Duration, Utc};
 use jsonwebtoken::{Header, encode};
 use serde_json::{Value, json};
-use tracing::info;
 
 use crate::{
     consts::{AUTH_TABLE_NAME, KEYS},
@@ -21,10 +20,11 @@ use crate::{
     },
     model::{
         app_state::AppState,
-        auth::{Claims, SignInInput, SignUpInput},
+        auth::{AuthBody, Claims, SignInInput, SignUpInput},
         error::Error,
         toml_config::AuthType,
     },
+    utils::decode_jwt::decode_jwt_and_result,
 };
 
 pub fn auth_router(config: AppState) -> Router<AppState> {
@@ -32,11 +32,78 @@ pub fn auth_router(config: AppState) -> Router<AppState> {
         .route("/", get(root))
         .route("/sign_in", post(sign_in))
         .route("/sign_up", post(sign_up))
+        .route("/refresh", post(refresh))
         .with_state(config)
 }
 
 pub async fn root() -> &'static str {
     "Hello, World!"
+}
+
+async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Result<Json<Value>, Error> {
+    if let Some(a) = state.config.auth {
+        if a == AuthType::Session {
+            if let Some(refresh_token_header) =
+                headers.get("x-refresh").and_then(|v| v.to_str().ok())
+            {
+                // if !decode_jwt(refresh_token_header) {
+                //     return Err(Error::Unauthorized);
+                // }
+
+                let jwt = decode_jwt_and_result(refresh_token_header)
+                    .and_then(|claim| Ok(claim.claims.sub))
+                    .map_err(|_| Error::Unauthorized);
+                if let Err(e) = jwt {
+                    return Err(e);
+                }
+
+                let user_id = jwt?;
+
+                let now = Utc::now().timestamp() as usize;
+                // let exp_time = now + Duration::days(7).num_seconds() as usize;
+                let exp_time = now + Duration::hours(1).num_seconds() as usize;
+
+                let issuer = "aginisi.com".to_string();
+                let claims = Claims {
+                    sub: user_id,
+                    exp: exp_time,
+                    iss: issuer.clone(),
+                    iat: now,
+                    nbf: now,
+                };
+
+                let token = encode(&Header::default(), &claims, &KEYS.encoding).unwrap();
+
+                let ref_claims = Claims {
+                    sub: user_id,
+                    exp: now + Duration::days(7).num_seconds() as usize,
+                    iss: issuer,
+                    iat: now,
+                    nbf: now,
+                };
+                let refresh_token =
+                    encode(&Header::default(), &ref_claims, &KEYS.encoding).unwrap();
+
+                // return Ok(Json(AuthBody {
+                //     token_type: "Bearer".to_string(),
+                //     access_token: token,
+                // }));
+                //
+
+                return Ok(Json(json!(AuthBody {
+                    access_token: token,
+                    refresh_token,
+                    token_type: "Bearer".to_string(),
+                })));
+            } else {
+                return Err(Error::BadRequest(None));
+            }
+        } else {
+            return Err(Error::BadRequest(None));
+        }
+    } else {
+        Err(Error::Forbidden)
+    }
 }
 
 async fn sign_up(Form(input): Form<SignUpInput>) -> Result<Json<Value>, Error> {
@@ -104,24 +171,38 @@ async fn sign_in(
                     let now = Utc::now().timestamp() as usize;
                     // let exp_time = now + Duration::days(7).num_seconds() as usize;
                     let exp_time = now + Duration::seconds(17).num_seconds() as usize;
+
                     let issuer = "aginisi.com".to_string();
                     let claims = Claims {
                         sub: user_id.unwrap(),
                         exp: exp_time,
-                        iss: issuer,
+                        iss: issuer.clone(),
                         iat: now,
                         nbf: now,
                     };
 
                     let token = encode(&Header::default(), &claims, &KEYS.encoding).unwrap();
 
+                    let ref_claims = Claims {
+                        sub: user_id.unwrap(),
+                        exp: now + Duration::days(7).num_seconds() as usize,
+                        iss: issuer,
+                        iat: now,
+                        nbf: now,
+                    };
+                    let refresh_token =
+                        encode(&Header::default(), &claims, &KEYS.encoding).unwrap();
+
                     // return Ok(Json(AuthBody {
                     //     token_type: "Bearer".to_string(),
                     //     access_token: token,
                     // }));
-                    return Ok(Json(json!( {
-                        "token_type": "Bearer".to_string(),
-                        "access_token": token,
+                    //
+
+                    return Ok(Json(json!(AuthBody {
+                        access_token: token,
+                        refresh_token,
+                        token_type: "Bearer".to_string(),
                     })));
                 }
                 AuthType::Session => {
